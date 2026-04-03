@@ -1,0 +1,2053 @@
+<!doctype html>
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cal AI Clone — Logic Flow</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Outfit:wght@300;400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #04070d;
+        --panel: #080f1a;
+        --panel2: #0c1525;
+        --border: #112240;
+        --border2: #1a3358;
+
+        --client: #00d4ff;
+        --gateway: #7b61ff;
+        --module: #00e5b0;
+        --ai: #ff9f1c;
+        --db: #4ade80;
+        --realtime: #f43f5e;
+        --infra: #a78bfa;
+        --queue: #fb923c;
+
+        --text: #cdd9f0;
+        --muted: #3d5a80;
+        --mono: "IBM Plex Mono", monospace;
+        --sans: "Outfit", sans-serif;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        min-height: 100vh;
+      }
+
+      /* Dot grid bg */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: radial-gradient(
+          circle,
+          rgba(0, 212, 255, 0.06) 1px,
+          transparent 1px
+        );
+        background-size: 28px 28px;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .page {
+        position: relative;
+        z-index: 1;
+        padding: 40px 20px 80px;
+        max-width: 1500px;
+        margin: 0 auto;
+      }
+
+      /* ─── HEADER ─── */
+      .header {
+        text-align: center;
+        margin-bottom: 52px;
+        animation: fadeIn 0.7s ease both;
+      }
+      .header-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-family: var(–mono);
+        font-size: 10px;
+        letter-spacing: 3px;
+        color: var(–client);
+        border: 1px solid rgba(0, 212, 255, 0.25);
+        padding: 5px 14px;
+        border-radius: 2px;
+        margin-bottom: 18px;
+      }
+      .header-badge::before {
+        content: "●";
+        font-size: 7px;
+        animation: blink 1.5s infinite;
+      }
+      .header h1 {
+        font-size: clamp(24px, 4vw, 48px);
+        font-weight: 800;
+        letter-spacing: -1.5px;
+        color: #fff;
+      }
+      .header h1 span {
+        color: var(--client);
+      }
+      .header p {
+        margin-top: 10px;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted);
+        letter-spacing: 1px;
+      }
+
+      /* ─── LEGEND ─── */
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 20px;
+        justify-content: center;
+        margin-bottom: 44px;
+        animation: fadeIn 0.7s 0.1s ease both;
+      }
+      .leg {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .leg-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      /* ─── TABS ─── */
+      .tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 32px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 4px;
+        width: fit-content;
+        margin-left: auto;
+        margin-right: auto;
+        animation: fadeIn 0.5s 0.2s ease both;
+      }
+      .tab {
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 7px 18px;
+        border-radius: 5px;
+        cursor: pointer;
+        color: var(--muted);
+        transition: all 0.2s;
+        border: none;
+        background: none;
+        letter-spacing: 0.5px;
+      }
+      .tab.active {
+        background: var(--border2);
+        color: var(--client);
+      }
+      .tab:hover:not(.active) {
+        color: var(--text);
+      }
+
+      /* ─── VIEW PANELS ─── */
+      .view {
+        display: none;
+      }
+      .view.active {
+        display: block;
+        animation: fadeIn 0.4s ease both;
+      }
+
+      /* ══════════════════════════════════════
+VIEW 1: ARCHITECTURE (layers)
+══════════════════════════════════════ */
+      .arch-layer {
+        margin-bottom: 12px;
+      }
+      .arch-label {
+        font-family: var(--mono);
+        font-size: 9px;
+        letter-spacing: 3px;
+        color: var(--muted);
+        text-transform: uppercase;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .arch-label::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+
+      .arch-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: stretch;
+      }
+
+      .node {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 14px;
+        flex: 1;
+        min-width: 140px;
+        max-width: 220px;
+        position: relative;
+        overflow: hidden;
+        transition:
+          transform 0.15s,
+          box-shadow 0.15s;
+        cursor: default;
+      }
+      .node::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        border-radius: 8px 8px 0 0;
+      }
+      .node:hover {
+        transform: translateY(-2px);
+      }
+
+      .node.client::before {
+        background: var(--client);
+      }
+      .node.client:hover {
+        border-color: rgba(0, 212, 255, 0.3);
+        box-shadow: 0 8px 24px rgba(0, 212, 255, 0.08);
+      }
+      .node.gateway::before {
+        background: var(--gateway);
+      }
+      .node.gateway:hover {
+        border-color: rgba(123, 97, 255, 0.3);
+        box-shadow: 0 8px 24px rgba(123, 97, 255, 0.08);
+      }
+      .node.module::before {
+        background: var(--module);
+      }
+      .node.module:hover {
+        border-color: rgba(0, 229, 176, 0.3);
+        box-shadow: 0 8px 24px rgba(0, 229, 176, 0.08);
+      }
+      .node.ai::before {
+        background: var(--ai);
+      }
+      .node.ai:hover {
+        border-color: rgba(255, 159, 28, 0.3);
+        box-shadow: 0 8px 24px rgba(255, 159, 28, 0.08);
+      }
+      .node.db::before {
+        background: var(--db);
+      }
+      .node.db:hover {
+        border-color: rgba(74, 222, 128, 0.3);
+        box-shadow: 0 8px 24px rgba(74, 222, 128, 0.08);
+      }
+      .node.realtime::before {
+        background: var(--realtime);
+      }
+      .node.realtime:hover {
+        border-color: rgba(244, 63, 94, 0.3);
+        box-shadow: 0 8px 24px rgba(244, 63, 94, 0.08);
+      }
+      .node.queue::before {
+        background: var(--queue);
+      }
+      .node.queue:hover {
+        border-color: rgba(251, 146, 60, 0.3);
+        box-shadow: 0 8px 24px rgba(251, 146, 60, 0.08);
+      }
+      .node.infra::before {
+        background: var(--infra);
+      }
+      .node.infra:hover {
+        border-color: rgba(167, 139, 250, 0.3);
+        box-shadow: 0 8px 24px rgba(167, 139, 250, 0.08);
+      }
+
+      .node-icon {
+        font-size: 18px;
+        display: block;
+        margin-bottom: 6px;
+      }
+      .node-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 4px;
+      }
+      .node-sub {
+        font-family: var(--mono);
+        font-size: 9px;
+        color: var(--muted);
+        line-height: 1.8;
+      }
+      .node-sub span {
+        display: block;
+      }
+
+      .badge {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 8px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        margin-top: 6px;
+        margin-right: 3px;
+        letter-spacing: 0.3px;
+      }
+      .badge.c {
+        background: rgba(0, 212, 255, 0.1);
+        color: var(--client);
+        border: 1px solid rgba(0, 212, 255, 0.2);
+      }
+      .badge.g {
+        background: rgba(123, 97, 255, 0.1);
+        color: #a89cff;
+        border: 1px solid rgba(123, 97, 255, 0.2);
+      }
+      .badge.m {
+        background: rgba(0, 229, 176, 0.1);
+        color: var(--module);
+        border: 1px solid rgba(0, 229, 176, 0.2);
+      }
+      .badge.a {
+        background: rgba(255, 159, 28, 0.1);
+        color: var(--ai);
+        border: 1px solid rgba(255, 159, 28, 0.2);
+      }
+      .badge.d {
+        background: rgba(74, 222, 128, 0.1);
+        color: var(--db);
+        border: 1px solid rgba(74, 222, 128, 0.2);
+      }
+      .badge.r {
+        background: rgba(244, 63, 94, 0.1);
+        color: var(--realtime);
+        border: 1px solid rgba(244, 63, 94, 0.2);
+      }
+      .badge.q {
+        background: rgba(251, 146, 60, 0.1);
+        color: var(--queue);
+        border: 1px solid rgba(251, 146, 60, 0.2);
+      }
+      .badge.i {
+        background: rgba(167, 139, 250, 0.1);
+        color: var(--infra);
+        border: 1px solid rgba(167, 139, 250, 0.2);
+      }
+
+      .arch-arrow {
+        text-align: center;
+        padding: 4px 0;
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--border2);
+        letter-spacing: 2px;
+      }
+
+      /* Wide node */
+      .node.wide {
+        max-width: 100%;
+        flex: 100%;
+      }
+      .node.wide .node-sub {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 24px;
+      }
+      .node.wide .node-sub span {
+        min-width: 160px;
+      }
+
+      /* ══════════════════════════════════════
+VIEW 2: LOGIC FLOW
+══════════════════════════════════════ */
+      .flow-title {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 3px;
+        color: var(–-muted);
+        text-transform: uppercase;
+        margin-bottom: 20px;
+        margin-top: 32px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .flow-title::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(–-border);
+      }
+      .flow-title:first-child {
+        margin-top: 0;
+      }
+
+      /* Main flow canvas */
+      .flow-canvas {
+        position: relative;
+        margin-bottom: 40px;
+      }
+
+      /* Flow row = one step */
+      .fl-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0;
+        position: relative;
+        margin-bottom: 0;
+      }
+
+      /* Left: step info */
+      .fl-step-meta {
+        width: 180px;
+        flex-shrink: 0;
+        padding: 16px 16px 16px 0;
+        text-align: right;
+      }
+      .fl-step-num {
+        font-family: var(–-mono);
+        font-size: 10px;
+        font-weight: 600;
+        color: var(–-muted);
+      }
+      .fl-step-name {
+        font-size: 12px;
+        font-weight: 700;
+        color: #fff;
+        margin-top: 2px;
+      }
+      .fl-step-desc {
+        font-family: var(–-mono);
+        font-size: 9px;
+        color: var(–-muted);
+        margin-top: 3px;
+        line-height: 1.5;
+      }
+
+      /* Center: vertical spine */
+      .fl-spine {
+        width: 40px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+      }
+      .fl-dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 2px solid;
+        background: var(–-bg);
+        flex-shrink: 0;
+        margin-top: 18px;
+        position: relative;
+        z-index: 2;
+      }
+      .fl-line {
+        width: 2px;
+        flex: 1;
+        min-height: 20px;
+        position: relative;
+        z-index: 1;
+      }
+
+      /* Right: message boxes */
+      .fl-messages {
+        flex: 1;
+        padding: 8px 0 8px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .msg {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        font-family: var(–-mono);
+        font-size: 10px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid var(–-border);
+        background: var(–-panel);
+        position: relative;
+        max-width: 640px;
+        line-height: 1.5;
+      }
+      .msg::before {
+        content: "";
+        position: absolute;
+        left: -1px;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        border-radius: 6px 0 0 6px;
+      }
+
+      .msg.send {
+        border-left-color: transparent;
+      }
+      .msg.recv {
+        border-left-color: transparent;
+        opacity: 0.85;
+      }
+
+      .msg-dir {
+        font-size: 8px;
+        padding: 1px 5px;
+        border-radius: 2px;
+        flex-shrink: 0;
+        margin-top: 1px;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+      }
+
+      .msg-body {
+        color: var(–-text);
+      }
+      .msg-body .key {
+        color: #fff;
+      }
+      .msg-body .val {
+        color: var(–-module);
+      }
+      .msg-body .type {
+        color: var(–-ai);
+      }
+      .msg-body .err {
+        color: var(–-realtime);
+      }
+      .msg-body .url {
+        color: var(–-client);
+      }
+
+      /* Color schemes per system */
+      .scheme-client .fl-dot {
+        border-color: var(–-client);
+      }
+      .scheme-client .fl-line {
+        background: linear-gradient(var(–-client), var(–-gateway));
+      }
+      .scheme-client .msg::before {
+        background: var(–-client);
+      }
+      .scheme-client .msg-dir {
+        background: rgba(0, 212, 255, 0.12);
+        color: var(–-client);
+      }
+
+      .scheme-gateway .fl-dot {
+        border-color: var(–-gateway);
+      }
+      .scheme-gateway .fl-line {
+        background: linear-gradient(var(–-gateway), var(–-module));
+      }
+      .scheme-gateway .msg::before {
+        background: var(–-gateway);
+      }
+      .scheme-gateway .msg-dir {
+        background: rgba(123, 97, 255, 0.12);
+        color: #a89cff;
+      }
+
+      .scheme-module .fl-dot {
+        border-color: var(–-module);
+      }
+      .scheme-module .fl-line {
+        background: linear-gradient(var(–-module), var(–-ai));
+      }
+      .scheme-module .msg::before {
+        background: var(–-module);
+      }
+      .scheme-module .msg-dir {
+        background: rgba(0, 229, 176, 0.12);
+        color: var(–-module);
+      }
+
+      .scheme-ai .fl-dot {
+        border-color: var(–-ai);
+      }
+      .scheme-ai .fl-line {
+        background: linear-gradient(var(–-ai), var(–-db));
+      }
+      .scheme-ai .msg::before {
+        background: var(–-ai);
+      }
+      .scheme-ai .msg-dir {
+        background: rgba(255, 159, 28, 0.12);
+        color: var(–-ai);
+      }
+
+      .scheme-db .fl-dot {
+        border-color: var(–-db);
+      }
+      .scheme-db .fl-line {
+        background: linear-gradient(var(–-db), var(–-realtime));
+      }
+      .scheme-db .msg::before {
+        background: var(–-db);
+      }
+      .scheme-db .msg-dir {
+        background: rgba(74, 222, 128, 0.12);
+        color: var(–-db);
+      }
+
+      .scheme-queue .fl-dot {
+        border-color: var(–-queue);
+      }
+      .scheme-queue .fl-line {
+        background: linear-gradient(var(–-queue), var(–-realtime));
+      }
+      .scheme-queue .msg::before {
+        background: var(–-queue);
+      }
+      .scheme-queue .msg-dir {
+        background: rgba(251, 146, 60, 0.12);
+        color: var(–-queue);
+      }
+
+      .scheme-realtime .fl-dot {
+        border-color: var(–-realtime);
+      }
+      .scheme-realtime .fl-line {
+        background: linear-gradient(var(–-realtime), transparent);
+      }
+      .scheme-realtime .msg::before {
+        background: var(–-realtime);
+      }
+      .scheme-realtime .msg-dir {
+        background: rgba(244, 63, 94, 0.12);
+        color: var(–-realtime);
+      }
+
+      /* last row no line */
+      .fl-row:last-child .fl-line {
+        display: none;
+      }
+
+      /* ─── SMALL CONNECTOR LABELS ─── */
+      .conn-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-family: var(–-mono);
+        font-size: 9px;
+        color: var(–-muted);
+        padding: 3px 8px;
+        border: 1px dashed var(–-border2);
+        border-radius: 3px;
+        margin: 2px 0;
+      }
+
+      /* ─── INTERACTION MATRIX ─── */
+      .matrix-wrap {
+        overflow-x: auto;
+        margin-bottom: 32px;
+      }
+      .matrix {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 700px;
+        font-family: var(–-mono);
+        font-size: 10px;
+      }
+      .matrix th,
+      .matrix td {
+        border: 1px solid var(–-border);
+        padding: 8px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+      .matrix th {
+        background: var(–-panel2);
+        color: var(–-muted);
+        font-size: 9px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+      .matrix td {
+        background: var(–-panel);
+        color: var(–-text);
+      }
+      .matrix tr:hover td {
+        background: var(–-panel2);
+      }
+      .matrix .from {
+        color: #fff;
+        font-weight: 600;
+      }
+      .matrix .to {
+        color: var(–-client);
+      }
+      .matrix .method {
+        color: var(–-ai);
+      }
+      .matrix .payload {
+        color: var(–-module);
+      }
+      .matrix .response {
+        color: var(–-db);
+      }
+
+      /* ─── STACK SUMMARY ─── */
+      .stack-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 20px;
+      }
+      .stack-chip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(–-panel);
+        border: 1px solid var(–-border);
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-family: var(–-mono);
+        font-size: 10px;
+        color: var(–-text);
+        transition: border-color 0.2s;
+      }
+      .stack-chip:hover {
+        border-color: var(–-border2);
+      }
+      .stack-chip-cat {
+        font-size: 8px;
+        color: var(–-muted);
+        display: block;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+
+      /* ─── GROQ HIGHLIGHT ─── */
+      .groq-banner {
+        background: linear-gradient(
+          135deg,
+          rgba(255, 159, 28, 0.07),
+          rgba(255, 159, 28, 0.03)
+        );
+        border: 1px solid rgba(255, 159, 28, 0.25);
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-family: var(–-mono);
+        font-size: 10px;
+        color: var(–-ai);
+      }
+      .groq-banner strong {
+        color: #fff;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <!-- HEADER -->
+
+      <div class="header">
+        <div class="header-badge">SYSTEM DESIGN v2</div>
+        <h1>Diet AI — <span>Logic Flow</span></h1>
+        <p>
+          NestJS · Flutter · Llama 4 Scout via Groq · PostgreSQL · MongoDB ·
+          Redis · Docker
+        </p>
+      </div>
+
+      <!-- LEGEND -->
+
+      <div class="legend">
+        <div class="leg">
+          <div class="leg-dot" style="background: var(--client)"></div>
+          Client
+        </div>
+        <div class="leg">
+          <div class="leg-dot" style="background: var(--gateway)"></div>
+          Gateway
+        </div>
+        <div class="leg">
+          <div class="leg-dot" style="background: var(--module)"></div>
+          NestJS Module
+        </div>
+        <div class="leg">
+          <div class="leg-dot" style="background: var(--ai)"></div>
+          AI / Groq
+        </div>
+        <div class="leg">
+          <div class="leg-dot" style="background: var(--db)"></div>
+          Database
+        </div>
+        <div class="leg">
+          <div class="leg-dot" style="background: var(--queue)"></div>
+          Queue
+        </div>
+        <div class="leg">
+          <div class="leg-dot" style="background: var(--realtime)"></div>
+          Realtime
+        </div>
+        <div class="leg">
+          <div class="leg-dot" style="background: var(--infra)"></div>
+          Infra
+        </div>
+      </div>
+
+      <!-- TABS -->
+
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('arch')">
+          Architecture
+        </button>
+        <button class="tab" onclick="switchTab('flow1')">Meal Scan Flow</button>
+        <button class="tab" onclick="switchTab('flow2')">AI Coach Flow</button>
+        <button class="tab" onclick="switchTab('flow3')">Chat Flow</button>
+        <button class="tab" onclick="switchTab('matrix')">
+          Interaction Matrix
+        </button>
+      </div>
+
+      <!-- ══════════════════════════════════════
+     VIEW: ARCHITECTURE
+══════════════════════════════════════ -->
+
+      <div class="view active" id="view-arch">
+        <div class="arch-layer">
+          <div class="arch-label">01 — Clients</div>
+          <div class="arch-row">
+            <div class="node client">
+              <span class="node-icon">📱</span>
+              <div class="node-title">Flutter Mobile</div>
+              <div class="node-sub">
+                <span>iOS & Android</span>
+                <span>Camera meal scan</span>
+                <span>Riverpod state</span>
+                <span>Dio HTTP client</span>
+              </div>
+              <span class="badge c">Flutter</span>
+              <span class="badge c">Dart</span>
+            </div>
+            <div class="node client">
+              <span class="node-icon">🌐</span>
+              <div class="node-title">Web App</div>
+              <div class="node-sub">
+                <span>Next.js / React</span>
+                <span>Community feed</span>
+                <span>Analytics dashboard</span>
+              </div>
+              <span class="badge c">Next.js</span>
+            </div>
+            <div class="node client">
+              <span class="node-icon">🖥️</span>
+              <div class="node-title">Admin Panel</div>
+              <div class="node-sub">
+                <span>User management</span>
+                <span>Content moderation</span>
+                <span>Metrics & reports</span>
+              </div>
+              <span class="badge c">Internal</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">↓ HTTPS REST + WSS ↓</div>
+
+        <div class="arch-layer">
+          <div class="arch-label">02 — API Gateway</div>
+          <div class="arch-row">
+            <div class="node gateway wide">
+              <span class="node-icon">🔀</span>
+              <div class="node-title">NestJS API Gateway</div>
+              <div class="node-sub">
+                <span>JWT Auth Guard (Passport)</span>
+                <span>class-validator Pipes</span>
+                <span>Rate Limiting (Throttler)</span>
+                <span>Helmet + CORS</span>
+                <span>Swagger / OpenAPI</span>
+                <span>Winston Logger</span>
+              </div>
+              <span class="badge g">Port 3000</span>
+              <span class="badge g">Nginx Proxy</span>
+              <span class="badge g">SSL/TLS</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">↓ Module Router ↓</div>
+
+        <div class="arch-layer">
+          <div class="arch-label">03 — NestJS Modules</div>
+          <div class="arch-row">
+            <div class="node module">
+              <span class="node-icon">🔐</span>
+              <div class="node-title">Auth</div>
+              <div class="node-sub">
+                <span>Register/Login</span>
+                <span>JWT + refresh</span>
+                <span>OAuth Google</span>
+              </div>
+              <span class="badge m">Passport</span>
+            </div>
+            <div class="node module">
+              <span class="node-icon">👤</span>
+              <div class="node-title">Users</div>
+              <div class="node-sub">
+                <span>Profile & goals</span>
+                <span>Health metrics</span>
+                <span>Subscription</span>
+              </div>
+              <span class="badge m">PG</span>
+            </div>
+            <div class="node module">
+              <span class="node-icon">🍽️</span>
+              <div class="node-title">Meals</div>
+              <div class="node-sub">
+                <span>Logging & history</span>
+                <span>Barcode scan</span>
+                <span>Food database</span>
+              </div>
+              <span class="badge m">PG</span>
+              <span class="badge m">Zod</span>
+            </div>
+            <div class="node module">
+              <span class="node-icon">📊</span>
+              <div class="node-title">Nutrition</div>
+              <div class="node-sub">
+                <span>Macro tracking</span>
+                <span>Calorie goals</span>
+                <span>Streaks</span>
+              </div>
+              <span class="badge m">PG</span>
+            </div>
+            <div class="node module">
+              <span class="node-icon">🤖</span>
+              <div class="node-title">AI Coach</div>
+              <div class="node-sub">
+                <span>Llama 4 Scout</span>
+                <span>Conversation ctx</span>
+                <span>Streaming SSE</span>
+              </div>
+              <span class="badge a">Groq</span>
+              <span class="badge m">Mongo</span>
+            </div>
+            <div class="node module">
+              <span class="node-icon">💬</span>
+              <div class="node-title">Chat</div>
+              <div class="node-sub">
+                <span>DMs & groups</span>
+                <span>WS gateway</span>
+                <span>Message history</span>
+              </div>
+              <span class="badge r">WS</span>
+              <span class="badge m">Mongo</span>
+            </div>
+            <div class="node module">
+              <span class="node-icon">🏘️</span>
+              <div class="node-title">Community</div>
+              <div class="node-sub">
+                <span>Posts & comments</span>
+                <span>Follows & feed</span>
+                <span>Reactions</span>
+              </div>
+              <span class="badge m">PG</span>
+            </div>
+            <div class="node module">
+              <span class="node-icon">🔔</span>
+              <div class="node-title">Notifications</div>
+              <div class="node-sub">
+                <span>Push via FCM</span>
+                <span>Email (Resend)</span>
+                <span>In-app feed</span>
+              </div>
+              <span class="badge q">BullMQ</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">↓ External API Calls ↓</div>
+
+        <div class="arch-layer">
+          <div class="arch-label">04 — AI / External Services</div>
+          <div class="arch-row">
+            <div class="node ai">
+              <span class="node-icon">⚡</span>
+              <div class="node-title">Groq + Llama 4 Scout</div>
+              <div class="node-sub">
+                <span>Vision: food detection</span>
+                <span>Text: AI coach chat</span>
+                <span>Streaming responses</span>
+                <span>Free tier generous</span>
+              </div>
+              <span class="badge a">meta-llama/llama-4-scout</span>
+            </div>
+            <div class="node ai">
+              <span class="node-icon">📦</span>
+              <div class="node-title">File Storage</div>
+              <div class="node-sub">
+                <span>Meal photo uploads</span>
+                <span>CDN delivery</span>
+                <span>Presigned URLs</span>
+              </div>
+              <span class="badge a">R2 / S3</span>
+            </div>
+            <div class="node ai">
+              <span class="node-icon">📧</span>
+              <div class="node-title">Email + Push</div>
+              <div class="node-sub">
+                <span>Transactional email</span>
+                <span>FCM push notifs</span>
+                <span>Async via queue</span>
+              </div>
+              <span class="badge a">Resend</span>
+              <span class="badge a">FCM</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">↓ Read / Write ↓</div>
+
+        <div class="arch-layer">
+          <div class="arch-label">05 — Data + Cache</div>
+          <div class="arch-row">
+            <div class="node db">
+              <span class="node-icon">🐘</span>
+              <div class="node-title">PostgreSQL</div>
+              <div class="node-sub">
+                <span>Users, meals, nutrition</span>
+                <span>Community posts</span>
+                <span>Subscriptions</span>
+                <span>pgvector for search</span>
+              </div>
+              <span class="badge d">Drizzle ORM</span>
+              <span class="badge d">drizzle-zod</span>
+            </div>
+            <div class="node db">
+              <span class="node-icon">🍃</span>
+              <div class="node-title">MongoDB</div>
+              <div class="node-sub">
+                <span>Chat messages</span>
+                <span>AI coach sessions</span>
+                <span>Notification feeds</span>
+                <span>Activity logs</span>
+              </div>
+              <span class="badge d">Mongoose</span>
+            </div>
+            <div class="node realtime">
+              <span class="node-icon">🔴</span>
+              <div class="node-title">Redis</div>
+              <div class="node-sub">
+                <span>Session cache</span>
+                <span>WS Pub/Sub</span>
+                <span>Rate limit state</span>
+                <span>BullMQ store</span>
+              </div>
+              <span class="badge r">Cache</span>
+              <span class="badge r">Pub/Sub</span>
+            </div>
+            <div class="node queue">
+              <span class="node-icon">⚙️</span>
+              <div class="node-title">BullMQ Queues</div>
+              <div class="node-sub">
+                <span>AI image jobs</span>
+                <span>Email/push jobs</span>
+                <span>Report generation</span>
+                <span>Feed refresh</span>
+              </div>
+              <span class="badge q">Workers</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">↓ Containers ↓</div>
+
+        <div class="arch-layer">
+          <div class="arch-label">06 — Infra</div>
+          <div class="arch-row">
+            <div class="node infra">
+              <span class="node-icon">🐳</span>
+              <div class="node-title">Docker Compose</div>
+              <div class="node-sub">
+                <span>nestjs-api</span>
+                <span>postgres</span>
+                <span>mongodb</span>
+                <span>redis</span>
+              </div>
+              <span class="badge i">Docker</span>
+            </div>
+            <div class="node infra">
+              <span class="node-icon">🌐</span>
+              <div class="node-title">VPS</div>
+              <div class="node-sub">
+                <span>Hetzner / Oracle</span>
+                <span>Nginx proxy</span>
+                <span>Certbot SSL</span>
+              </div>
+              <span class="badge i">Nginx</span>
+            </div>
+            <div class="node infra">
+              <span class="node-icon">🔄</span>
+              <div class="node-title">CI/CD</div>
+              <div class="node-sub">
+                <span>GitHub Actions</span>
+                <span>Auto deploy</span>
+                <span>DB migrations</span>
+              </div>
+              <span class="badge i">GH Actions</span>
+            </div>
+            <div class="node infra">
+              <span class="node-icon">📈</span>
+              <div class="node-title">Observability</div>
+              <div class="node-sub">
+                <span>Sentry errors</span>
+                <span>Winston logs</span>
+                <span>Health checks</span>
+              </div>
+              <span class="badge i">Sentry</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+     VIEW: MEAL SCAN FLOW
+══════════════════════════════════════ -->
+
+      <div class="view" id="view-flow1">
+        <div class="groq-banner">
+          <span>⚡</span>
+          <div>
+            <strong>Groq + Llama 4 Scout Vision</strong> — handles food photo
+            analysis. Free tier supports high volume. Model:
+            <code>meta-llama/llama-4-scout-17b-16e-instruct</code>
+          </div>
+        </div>
+
+        <div class="flow-title">Meal Photo Scan — Full Logic Flow</div>
+        <div class="flow-canvas">
+          ```
+          <div class="fl-row scheme-client">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 01</div>
+              <div class="fl-step-name">Flutter → Gateway</div>
+              <div class="fl-step-desc">
+                User taps camera,<br />takes food photo
+              </div>
+            </div>
+            <div class="fl-spine">
+              <div class="fl-dot"></div>
+              <div class="fl-line"></div>
+            </div>
+            <div class="fl-messages">
+              <div class="msg send">
+                <span class="msg-dir">SEND</span>
+                <div class="msg-body">
+                  <span class="url">POST /api/v1/meals/scan</span><br />
+                  <span class="key">Authorization:</span>
+                  <span class="val">Bearer &lt;jwt&gt;</span><br />
+                  <span class="key">Content-Type:</span>
+                  <span class="val">multipart/form-data</span><br />
+                  <span class="key">body:</span>
+                  <span class="type"
+                    >{ image: File, portion_hint?: string }</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fl-row scheme-gateway">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 02</div>
+              <div class="fl-step-name">Gateway Validates</div>
+              <div class="fl-step-desc">
+                Auth guard checks JWT,<br />class-validator runs,<br />multer
+                handles file
+              </div>
+            </div>
+            <div class="fl-spine">
+              <div class="fl-dot"></div>
+              <div class="fl-line"></div>
+            </div>
+            <div class="fl-messages">
+              <div class="msg send">
+                <span class="msg-dir">CHECK</span>
+                <div class="msg-body">
+                  <span class="key">JWT verified</span> →
+                  <span class="val">userId extracted</span><br />
+                  <span class="key">File validated</span> →
+                  <span class="type">mime: image/*, maxSize: 10MB</span><br />
+                  <span class="key">Upload to R2</span> →
+                  <span class="val">meals/{userId}/{uuid}.jpg</span>
+                </div>
+              </div>
+              <div class="msg recv">
+                <span class="msg-dir">FAIL</span>
+                <div class="msg-body">
+                  <span class="err">401 Unauthorized</span> — invalid/expired
+                  token<br />
+                  <span class="err">413 Payload Too Large</span> — file &gt;
+                  10MB<br />
+                  <span class="err">422 Unprocessable</span> — not an image
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fl-row scheme-queue">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 03</div>
+              <div class="fl-step-name">Queue Job Created</div>
+              <div class="fl-step-desc">
+                Async processing starts,<br />user gets instant jobId
+              </div>
+            </div>
+            <div class="fl-spine">
+              <div class="fl-dot"></div>
+              <div class="fl-line"></div>
+            </div>
+            <div class="fl-messages">
+              <div class="msg send">
+                <span class="msg-dir">ENQUEUE</span>
+                <div class="msg-body">
+                  <span class="key">BullMQ</span> → queue:
+                  <span class="val">"meal-scan"</span><br />
+                  <span class="key">payload:</span>
+                  <span class="type"
+                    >{ jobId, userId, imageUrl, portionHint }</span
+                  >
+                </div>
+              </div>
+              <div class="msg recv">
+                <span class="msg-dir">RECV</span>
+                <div class="msg-body">
+                  <span class="key">HTTP 202 Accepted</span><br />
+                  <span class="type"
+                    >{ jobId: "uuid", status: "processing", estimatedMs: 2000
+                    }</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fl-row scheme-ai">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 04</div>
+              <div class="fl-step-name">Groq Vision Call</div>
+              <div class="fl-step-desc">
+                Worker picks job,<br />calls Llama 4 Scout<br />with image +
+                prompt
+              </div>
+            </div>
+            <div class="fl-spine">
+              <div class="fl-dot"></div>
+              <div class="fl-line"></div>
+            </div>
+            <div class="fl-messages">
+              <div class="msg send">
+                <span class="msg-dir">SEND → GROQ</span>
+                <div class="msg-body">
+                  <span class="url"
+                    >POST https://api.groq.com/openai/v1/chat/completions</span
+                  ><br />
+                  <span class="key">model:</span>
+                  <span class="val"
+                    >"meta-llama/llama-4-scout-17b-16e-instruct"</span
+                  ><br />
+                  <span class="key">messages[0]:</span>
+                  <span class="type"
+                    >{ role: "user", content: [image_url, text_prompt] }</span
+                  ><br />
+                  <span class="key">prompt:</span>
+                  <span class="val"
+                    >"Analyze food. Return JSON: {foods[], calories, protein,
+                    carbs, fat}"</span
+                  >
+                </div>
+              </div>
+              <div class="msg recv">
+                <span class="msg-dir">RECV ← GROQ</span>
+                <div class="msg-body">
+                  <span class="type"
+                    >{ foods: [{name:"chicken breast", grams:150,
+                    calories:248}], totalCalories: 412, protein: 38, carbs: 22,
+                    fat: 12 }</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fl-row scheme-module">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 05</div>
+              <div class="fl-step-name">Zod Validates AI</div>
+              <div class="fl-step-desc">
+                AI response parsed +<br />validated before<br />touching DB
+              </div>
+            </div>
+            <div class="fl-spine">
+              <div class="fl-dot"></div>
+              <div class="fl-line"></div>
+            </div>
+            <div class="fl-messages">
+              <div class="msg send">
+                <span class="msg-dir">VALIDATE</span>
+                <div class="msg-body">
+                  <span class="key">drizzle-zod schema</span> →
+                  <span class="val">insertMealSchema.parse(aiResponse)</span
+                  ><br />
+                  <span class="key">Checks:</span>
+                  <span class="type"
+                    >calories ≥ 0, protein ≥ 0, foods.length &gt; 0</span
+                  >
+                </div>
+              </div>
+              <div class="msg recv">
+                <span class="msg-dir">FAIL</span>
+                <div class="msg-body">
+                  <span class="err">ZodError</span> → job marked failed, user
+                  notified to retry<br />
+                  <span class="err">e.g. calories: -1</span> →
+                  <span class="val"
+                    >fallback: ask user to confirm manually</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fl-row scheme-db">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 06</div>
+              <div class="fl-step-name">Save to PostgreSQL</div>
+              <div class="fl-step-desc">
+                Validated meal written<br />to DB via Drizzle
+              </div>
+            </div>
+            <div class="fl-spine">
+              <div class="fl-dot"></div>
+              <div class="fl-line"></div>
+            </div>
+            <div class="fl-messages">
+              <div class="msg send">
+                <span class="msg-dir">INSERT</span>
+                <div class="msg-body">
+                  <span class="key">table:</span>
+                  <span class="val">meals</span> +
+                  <span class="val">meal_items</span><br />
+                  <span class="type"
+                    >{ id, userId, imageUrl, calories:412, protein:38, carbs:22,
+                    fat:12, foods:[...], scannedAt }</span
+                  >
+                </div>
+              </div>
+              <div class="msg recv">
+                <span class="msg-dir">RECV</span>
+                <div class="msg-body">
+                  <span class="val">meal.id = "uuid"</span> → job marked
+                  <span class="val">completed</span><br />
+                  <span class="key">Daily totals</span> recalculated in
+                  <span class="val">nutrition</span> table
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fl-row scheme-realtime">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 07</div>
+              <div class="fl-step-name">WebSocket Push</div>
+              <div class="fl-step-desc">
+                Flutter app receives<br />result live, no polling
+              </div>
+            </div>
+            <div class="fl-spine">
+              <div class="fl-dot"></div>
+              <div class="fl-line"></div>
+            </div>
+            <div class="fl-messages">
+              <div class="msg send">
+                <span class="msg-dir">EMIT → WS</span>
+                <div class="msg-body">
+                  <span class="key">event:</span>
+                  <span class="val">"meal.scan.complete"</span><br />
+                  <span class="key">room:</span>
+                  <span class="val">user:{userId}</span><br />
+                  <span class="type"
+                    >{ jobId, meal: { id, calories, protein, carbs, fat, foods[]
+                    }, dailyTotal }</span
+                  >
+                </div>
+              </div>
+              <div class="msg recv">
+                <span class="msg-dir">FLUTTER RECV</span>
+                <div class="msg-body">
+                  <span class="key">Riverpod notifier</span> updates state →
+                  <span class="val">UI rebuilds</span><br />
+                  <span class="key">Meal card</span> appears in today's log ✓<br />
+                  <span class="key">Calories ring</span> animates to new total ✓
+                </div>
+              </div>
+            </div>
+          </div>
+          ```
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+     VIEW: AI COACH FLOW
+══════════════════════════════════════ -->
+
+      <div class="view" id="view-flow2">
+        <div class="groq-banner">
+          <span>🧠</span>
+          <div>
+            <strong>Llama 4 Scout via Groq</strong> — streaming text responses
+            for coach conversations. User meal history injected as context for
+            personalized advice.
+          </div>
+        </div>
+
+        <div class="flow-title">AI Coach Conversation — Full Logic Flow</div>
+        <div class="flow-canvas">
+          ```
+          <div class="fl-row scheme-client">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 01</div>
+              <div class="fl-step-name">Flutter → Coach API</div>
+              <div class="fl-step-desc">
+                User sends message<br />to AI coach
+              </div>
+            </div>
+            <div class="fl-spine">
+              <div class="fl-dot"></div>
+              <div class="fl-line"></div>
+            </div>
+            <div class="fl-messages">
+              <div class="msg send">
+                <span class="msg-dir">SEND</span>
+                <div class="msg-body">
+                  <span class="url">POST /api/v1/coach/message</span><br />
+                  <span class="key">body:</span>
+                  <span class="type"
+                    >{ sessionId?: string, message: "Why am I not losing
+                    weight?" }</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fl-row scheme-module">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 02</div>
+              <div class="fl-step-name">Load Context</div>
+              <div class="fl-step-desc">
+                Fetch user history<br />to inject into prompt
+              </div>
+            </div>
+            <div class="fl-spine">
+              <div class="fl-dot"></div>
+              <div class="fl-line"></div>
+            </div>
+            <div class="fl-messages">
+              <div class="msg send">
+                <span class="msg-dir">QUERY PG</span>
+                <div class="msg-body">
+                  <span class="key">Last 7 days meals</span> → avg calories,
+                  macros, meal times<br />
+                  <span class="key">User profile</span> → age, weight, height,
+                  goal (lose/gain/maintain)
+                </div>
+              </div>
+              <div class="msg send">
+                <span class="msg-dir">QUERY MONGO</span>
+                <div class="msg-body">
+                  <span class="key">coach_sessions</span> → last 10 messages for
+                  conversation continuity<br />
+                  <span class="key">coach_context</span> → user memory (known
+                  preferences, past insights)
+                </div>
+              </div>
+              <div class="msg recv">
+                <span class="msg-dir">BUILT PROMPT</span>
+                <div class="msg-body">
+                  <span class="type"
+                    >System: "You are a nutrition coach. User data: {profile}.
+                    Recent meals: {mealSummary}. Past conversation:
+                    {history}"</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fl-row scheme-ai">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 03</div>
+              <div class="fl-step-name">Groq Streaming</div>
+              <div class="fl-step-desc">
+                Llama 4 Scout generates<br />response, streamed<br />back via
+                SSE
+              </div>
+            </div>
+            <div class="fl-spine">
+              <div class="fl-dot"></div>
+              <div class="fl-line"></div>
+            </div>
+            <div class="fl-messages">
+              <div class="msg send">
+                <span class="msg-dir">SEND → GROQ</span>
+                <div class="msg-body">
+                  <span class="url"
+                    >POST https://api.groq.com/openai/v1/chat/completions</span
+                  ><br />
+                  <span class="key">model:</span>
+                  <span class="val"
+                    >"meta-llama/llama-4-scout-17b-16e-instruct"</span
+                  ><br />
+                  <span class="key">stream:</span> <span class="val">true</span
+                  ><br />
+                  <span class="key">messages:</span>
+                  <span class="type"
+                    >[system_ctx, ...history, user_message]</span
+                  >
+                </div>
+              </div>
+              <div class="msg recv">
+                <span class="msg-dir">STREAM ← GROQ</span>
+                <div class="msg-body">
+                  <span class="key">SSE chunks:</span>
+                  <span class="type"
+                    >data: {"delta":{"content":"Based on your meals..."}} </span
+                  ><br />
+                  <span class="val"
+                    >Each chunk forwarded immediately to Flutter via SSE
+                    response</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fl-row scheme-db">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 04</div>
+              <div class="fl-step-name">Persist Session</div>
+              <div class="fl-step-desc">
+                After stream ends,<br />save to MongoDB
+              </div>
+            </div>
+            <div class="fl-spine">
+              <div class="fl-dot"></div>
+              <div class="fl-line"></div>
+            </div>
+            <div class="fl-messages">
+              <div class="msg send">
+                <span class="msg-dir">INSERT MONGO</span>
+                <div class="msg-body">
+                  <span class="key">coach_sessions</span> →
+                  <span class="type"
+                    >{ sessionId, userId, role:"user", content, timestamp
+                    }</span
+                  ><br />
+                  <span class="key">coach_sessions</span> →
+                  <span class="type"
+                    >{ sessionId, userId, role:"assistant", content:
+                    fullResponse, timestamp }</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fl-row scheme-client">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 05</div>
+              <div class="fl-step-name">Flutter Renders</div>
+              <div class="fl-step-desc">
+                Streaming text appears<br />word by word in UI
+              </div>
+            </div>
+            <div class="fl-spine"><div class="fl-dot"></div></div>
+            <div class="fl-messages">
+              <div class="msg recv">
+                <span class="msg-dir">FLUTTER RECV</span>
+                <div class="msg-body">
+                  <span class="key">StreamBuilder</span> listens to SSE
+                  stream<br />
+                  <span class="key">Text widget</span> appends each chunk →
+                  <span class="val">typewriter effect ✓</span><br />
+                  <span class="key">On stream end</span> → show action buttons
+                  (log meal, set goal)
+                </div>
+              </div>
+            </div>
+          </div>
+          ```
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+     VIEW: CHAT FLOW
+══════════════════════════════════════ -->
+
+      <div class="view" id="view-flow3">
+        <div class="flow-title">Real-Time Chat — Full Logic Flow</div>
+        <div class="flow-canvas">
+          ```
+          <div class="fl-row scheme-client">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 01</div>
+              <div class="fl-step-name">WS Handshake</div>
+              <div class="fl-step-desc">
+                Flutter connects on<br />app launch
+              </div>
+            </div>
+            <div class="fl-spine">
+              <div class="fl-dot"></div>
+              <div class="fl-line"></div>
+            </div>
+            <div class="fl-messages">
+              <div class="msg send">
+                <span class="msg-dir">CONNECT</span>
+                <div class="msg-body">
+                  <span class="url"
+                    >wss://api.yourdomain.com/socket.io/?token=&lt;jwt&gt;</span
+                  ><br />
+                  <span class="key">NestJS WsGuard</span> verifies token →
+                  <span class="val">attaches userId to socket</span>
+                </div>
+              </div>
+              <div class="msg recv">
+                <span class="msg-dir">SERVER ACK</span>
+                <div class="msg-body">
+                  <span class="key">event:</span>
+                  <span class="val">"connected"</span> →
+                  <span class="type">{ socketId, userId }</span><br />
+                  <span class="key">Auto-join rooms:</span>
+                  <span class="val">user:{userId}</span>, all active
+                  conversation rooms
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fl-row scheme-client">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 02</div>
+              <div class="fl-step-name">Send Message</div>
+              <div class="fl-step-desc">
+                User types and sends<br />in a chat room
+              </div>
+            </div>
+            <div class="fl-spine">
+              <div class="fl-dot"></div>
+              <div class="fl-line"></div>
+            </div>
+            <div class="fl-messages">
+              <div class="msg send">
+                <span class="msg-dir">EMIT → SERVER</span>
+                <div class="msg-body">
+                  <span class="key">event:</span>
+                  <span class="val">"chat.message"</span><br />
+                  <span class="type"
+                    >{ conversationId: "uuid", content: "Great progress today!",
+                    type: "text" }</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fl-row scheme-module">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 03</div>
+              <div class="fl-step-name">Server Processes</div>
+              <div class="fl-step-desc">
+                NestJS WS gateway<br />handles event
+              </div>
+            </div>
+            <div class="fl-spine">
+              <div class="fl-dot"></div>
+              <div class="fl-line"></div>
+            </div>
+            <div class="fl-messages">
+              <div class="msg send">
+                <span class="msg-dir">VALIDATE</span>
+                <div class="msg-body">
+                  <span class="key">class-validator</span> → content not empty,
+                  type in enum<br />
+                  <span class="key">Auth check</span> → sender is member of
+                  conversationId
+                </div>
+              </div>
+              <div class="msg send">
+                <span class="msg-dir">INSERT MONGO</span>
+                <div class="msg-body">
+                  <span class="key">collection:</span>
+                  <span class="val">messages</span><br />
+                  <span class="type"
+                    >{ _id, conversationId, senderId, content, type, sentAt,
+                    readBy:[] }</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fl-row scheme-realtime">
+            <div class="fl-step-meta">
+              <div class="fl-step-num">STEP 04</div>
+              <div class="fl-step-name">Broadcast</div>
+              <div class="fl-step-desc">
+                Message pushed to<br />all room members
+              </div>
+            </div>
+            <div class="fl-spine">
+              <div class="fl-dot"></div>
+              <div class="fl-line"></div>
+            </div>
+            <div class="fl-messages">
+              <div class="msg send">
+                <span class="msg-dir">EMIT → ROOM</span>
+                <div class="msg-body">
+                  <span class="key">room:</span>
+                  <span class="val">conversation:{conversationId}</span><br />
+                  <span class="key">event:</span>
+                  <span class="val">"chat.new_message"</span><br />
+                  <span class="type"
+                    >{ messageId, senderId, senderName, content, sentAt }</span
+                  >
+                </div>
+              </div>
+              <div class="msg send">
+                <span class="msg-dir">OFFLINE USERS</span>
+                <div class="msg-body">
+                  <span class="key">BullMQ</span> → enqueue push notification
+                  job<br />
+                  <span class="key">FCM</span> →
+                  <span class="val">"New message from {senderName}"</span>
+                </div>
+              </div>
+              <div class="msg recv">
+                <span class="msg-dir">FLUTTER RECV</span>
+                <div class="msg-body">
+                  <span class="key">Socket listener</span> → message appended to
+                  chat list<br />
+                  <span class="key">Read receipt</span> → emit
+                  <span class="val">"chat.read"</span> → updates
+                  <span class="val">readBy[]</span> ✓
+                </div>
+              </div>
+            </div>
+          </div>
+          ```
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════
+     VIEW: INTERACTION MATRIX
+══════════════════════════════════════ -->
+
+      <div class="view" id="view-matrix">
+        <div class="flow-title">
+          All System Interactions — Send / Receive Matrix
+        </div>
+        <div class="matrix-wrap">
+          <table class="matrix">
+            <thead>
+              <tr>
+                <th>FROM</th>
+                <th>TO</th>
+                <th>METHOD</th>
+                <th>SENDS</th>
+                <th>RECEIVES</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="from">Flutter</td>
+                <td class="to">NestJS Gateway</td>
+                <td class="method">HTTP POST multipart</td>
+                <td class="payload">{ image: File, portionHint? }</td>
+                <td class="response">{ jobId, status: "processing" } 202</td>
+              </tr>
+              <tr>
+                <td class="from">Flutter</td>
+                <td class="to">NestJS Gateway</td>
+                <td class="method">HTTP POST JSON</td>
+                <td class="payload">{ email, password }</td>
+                <td class="response">{ accessToken, refreshToken, user }</td>
+              </tr>
+              <tr>
+                <td class="from">Flutter</td>
+                <td class="to">NestJS WS</td>
+                <td class="method">WebSocket connect</td>
+                <td class="payload">token in handshake query</td>
+                <td class="response">{ socketId } — joins user room</td>
+              </tr>
+              <tr>
+                <td class="from">Flutter</td>
+                <td class="to">NestJS WS</td>
+                <td class="method">emit "chat.message"</td>
+                <td class="payload">{ conversationId, content, type }</td>
+                <td class="response">broadcast to room members</td>
+              </tr>
+              <tr>
+                <td class="from">Flutter</td>
+                <td class="to">NestJS SSE</td>
+                <td class="method">HTTP GET stream</td>
+                <td class="payload">{ sessionId, message }</td>
+                <td class="response">SSE text/event-stream chunks</td>
+              </tr>
+              <tr>
+                <td class="from">NestJS Gateway</td>
+                <td class="to">Auth Module</td>
+                <td class="method">Guard intercept</td>
+                <td class="payload">JWT from Authorization header</td>
+                <td class="response">{ userId, role } or 401</td>
+              </tr>
+              <tr>
+                <td class="from">Meals Module</td>
+                <td class="to">R2 / S3</td>
+                <td class="method">HTTP PUT (presigned)</td>
+                <td class="payload">image binary</td>
+                <td class="response">stored URL</td>
+              </tr>
+              <tr>
+                <td class="from">Meals Module</td>
+                <td class="to">BullMQ</td>
+                <td class="method">queue.add()</td>
+                <td class="payload">{ jobId, userId, imageUrl }</td>
+                <td class="response">job queued, worker picks up async</td>
+              </tr>
+              <tr>
+                <td class="from">BullMQ Worker</td>
+                <td class="to">Groq API</td>
+                <td class="method">HTTP POST JSON</td>
+                <td class="payload">
+                  { model, messages:[{image_url, prompt}] }
+                </td>
+                <td class="response">
+                  { foods[], calories, protein, carbs, fat }
+                </td>
+              </tr>
+              <tr>
+                <td class="from">BullMQ Worker</td>
+                <td class="to">Zod (drizzle-zod)</td>
+                <td class="method">schema.parse()</td>
+                <td class="payload">raw Groq JSON response</td>
+                <td class="response">typed MealInsert | ZodError</td>
+              </tr>
+              <tr>
+                <td class="from">Meals Module</td>
+                <td class="to">PostgreSQL</td>
+                <td class="method">Drizzle INSERT</td>
+                <td class="payload">validated meal + items rows</td>
+                <td class="response">meal.id (uuid)</td>
+              </tr>
+              <tr>
+                <td class="from">Meals Module</td>
+                <td class="to">WS Gateway</td>
+                <td class="method">server.to(room).emit()</td>
+                <td class="payload">{ meal, dailyTotal }</td>
+                <td class="response">Flutter receives "meal.scan.complete"</td>
+              </tr>
+              <tr>
+                <td class="from">AI Coach Module</td>
+                <td class="to">PostgreSQL</td>
+                <td class="method">Drizzle SELECT</td>
+                <td class="payload">userId, last 7 days</td>
+                <td class="response">meal history, user profile</td>
+              </tr>
+              <tr>
+                <td class="from">AI Coach Module</td>
+                <td class="to">MongoDB</td>
+                <td class="method">Mongoose find()</td>
+                <td class="payload">{ sessionId, limit: 10 }</td>
+                <td class="response">last N messages for context</td>
+              </tr>
+              <tr>
+                <td class="from">AI Coach Module</td>
+                <td class="to">Groq API</td>
+                <td class="method">HTTP POST stream:true</td>
+                <td class="payload">
+                  { model, messages:[sys+history+user], stream:true }
+                </td>
+                <td class="response">SSE chunks → forwarded to Flutter</td>
+              </tr>
+              <tr>
+                <td class="from">Chat Module</td>
+                <td class="to">MongoDB</td>
+                <td class="method">Mongoose insertOne()</td>
+                <td class="payload">message document</td>
+                <td class="response">{ _id, sentAt }</td>
+              </tr>
+              <tr>
+                <td class="from">Chat Module</td>
+                <td class="to">Redis Pub/Sub</td>
+                <td class="method">publish(channel, msg)</td>
+                <td class="payload">serialized message</td>
+                <td class="response">
+                  all WS instances receive (horizontal scale)
+                </td>
+              </tr>
+              <tr>
+                <td class="from">Notifications Module</td>
+                <td class="to">BullMQ</td>
+                <td class="method">queue.add("push")</td>
+                <td class="payload">{ userId, title, body, data }</td>
+                <td class="response">job processed by notification worker</td>
+              </tr>
+              <tr>
+                <td class="from">BullMQ Worker</td>
+                <td class="to">FCM</td>
+                <td class="method">HTTP POST JSON</td>
+                <td class="payload">{ token, notification, data }</td>
+                <td class="response">{ success: true } or error</td>
+              </tr>
+              <tr>
+                <td class="from">NestJS</td>
+                <td class="to">Redis</td>
+                <td class="method">SET / GET / INCR</td>
+                <td class="payload">session keys, rate limit counters</td>
+                <td class="response">cached values, TTL-based expiry</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flow-title">Updated Stack — v2</div>
+        <div class="stack-row">
+          <div class="stack-chip">
+            📱
+            <div><span class="stack-chip-cat">Mobile</span>Flutter + Dart</div>
+          </div>
+          <div class="stack-chip">
+            🏗️
+            <div><span class="stack-chip-cat">Backend</span>NestJS</div>
+          </div>
+          <div class="stack-chip">
+            📘
+            <div><span class="stack-chip-cat">Language</span>TypeScript</div>
+          </div>
+          <div class="stack-chip">
+            ⚡
+            <div><span class="stack-chip-cat">AI Provider</span>Groq</div>
+          </div>
+          <div class="stack-chip">
+            🦙
+            <div><span class="stack-chip-cat">AI Model</span>Llama 4 Scout</div>
+          </div>
+          <div class="stack-chip">
+            🐘
+            <div><span class="stack-chip-cat">Primary DB</span>PostgreSQL</div>
+          </div>
+          <div class="stack-chip">
+            🍃
+            <div><span class="stack-chip-cat">Secondary DB</span>MongoDB</div>
+          </div>
+          <div class="stack-chip">
+            🔴
+            <div><span class="stack-chip-cat">Cache</span>Redis</div>
+          </div>
+          <div class="stack-chip">
+            ⚙️
+            <div><span class="stack-chip-cat">Queue</span>BullMQ</div>
+          </div>
+          <div class="stack-chip">
+            🔧
+            <div><span class="stack-chip-cat">ORM</span>Drizzle ORM</div>
+          </div>
+          <div class="stack-chip">
+            ✅
+            <div>
+              <span class="stack-chip-cat">DB Validation</span>drizzle-zod
+            </div>
+          </div>
+          <div class="stack-chip">
+            🛡️
+            <div>
+              <span class="stack-chip-cat">HTTP Validation</span>class-validator
+            </div>
+          </div>
+          <div class="stack-chip">
+            🔌
+            <div><span class="stack-chip-cat">Realtime</span>Socket.io</div>
+          </div>
+          <div class="stack-chip">
+            📦
+            <div><span class="stack-chip-cat">Storage</span>R2 / S3</div>
+          </div>
+          <div class="stack-chip">
+            🐳
+            <div><span class="stack-chip-cat">Deploy</span>Docker Compose</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- end page -->
+
+    <script>
+      function switchTab(id) {
+        document
+          .querySelectorAll(".tab")
+          .forEach((t) => t.classList.remove("active"));
+        document
+          .querySelectorAll(".view")
+          .forEach((v) => v.classList.remove("active"));
+        event.target.classList.add("active");
+        document.getElementById("view-" + id).classList.add("active");
+      }
+    </script>
+  </body>
+</html>
