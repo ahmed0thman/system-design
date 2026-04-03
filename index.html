@@ -1,12 +1,350 @@
-<!doctype html>
-
 <html lang="en">
   <head>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.13/html-to-image.min.js"
+      integrity="sha512-iZ2ORl595Wx6miw+GuadDet4WQbdSWS3JLMoNfY8cRGoEFy6oT3G9IbcrBeL6AfkgpA51ETt/faX6yLV+/gFJg=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <script>
+      (function () {
+        const originalConsole = window.console;
+        window.console = {
+          log: (...args) => {
+            originalConsole.log(...args);
+            window.parent.postMessage(
+              { type: "console", message: args.join(" ") },
+              "*",
+            );
+          },
+          error: (...args) => {
+            originalConsole.error(...args);
+            window.parent.postMessage(
+              { type: "console", message: "Error: " + args.join(" ") },
+              "*",
+            );
+          },
+          warn: (...args) => {
+            originalConsole.warn(...args);
+            window.parent.postMessage(
+              { type: "console", message: "Warning: " + args.join(" ") },
+              "*",
+            );
+          },
+        };
+
+        let requestId = 0;
+        let callbacksMap = new Map();
+        let streamControllers = new Map();
+
+        window.claude = {
+          complete: (prompt) => {
+            return new Promise((resolve, reject) => {
+              const id = requestId++;
+              callbacksMap.set(id, { resolve, reject });
+              window.parent.postMessage(
+                { type: "claudeComplete", id, prompt },
+                "*",
+              );
+            });
+          },
+        };
+
+        window.storage = {
+          get: (key, shared = false) => {
+            return new Promise((resolve, reject) => {
+              const id = requestId++;
+              callbacksMap.set(id, { resolve, reject });
+              window.parent.postMessage(
+                { type: "storageGet", id, key, shared },
+                "*",
+              );
+            });
+          },
+          set: (key, value, shared = false) => {
+            return new Promise((resolve, reject) => {
+              const id = requestId++;
+              callbacksMap.set(id, { resolve, reject });
+              window.parent.postMessage(
+                { type: "storageSet", id, key, value, shared },
+                "*",
+              );
+            });
+          },
+          delete: (key, shared = false) => {
+            return new Promise((resolve, reject) => {
+              const id = requestId++;
+              callbacksMap.set(id, { resolve, reject });
+              window.parent.postMessage(
+                { type: "storageDelete", id, key, shared },
+                "*",
+              );
+            });
+          },
+          list: (prefix, shared = false) => {
+            return new Promise((resolve, reject) => {
+              const id = requestId++;
+              callbacksMap.set(id, { resolve, reject });
+              window.parent.postMessage(
+                { type: "storageList", id, prefix, shared },
+                "*",
+              );
+            });
+          },
+        };
+
+        let pendingBlobs = new Map();
+        URL.createObjectURL = (blob) => {
+          // Store the blob and create an ID and URL for it
+          const blobId = `blob-${Date.now()}-${Math.random()}`;
+          pendingBlobs.set(blobId, blob);
+          return `blob-request://${blobId}`;
+        };
+
+        URL.revokeObjectURL = (url) => {
+          // Remove the blob from our store
+          const blobId = url.replace("blob-request://", "");
+          pendingBlobs.delete(blobId);
+        };
+
+        const getBlobFromURL = (url) => {
+          const blobId = url.replace("blob-request://", "");
+          return pendingBlobs.get(blobId);
+        };
+
+        // Override global fetch with streaming support
+        window.fetch = (url, init = {}) => {
+          return new Promise((resolve, reject) => {
+            const id = requestId++;
+            const channelId = `fetch-${id}-${Date.now()}`;
+
+            callbacksMap.set(id, {
+              resolve: (response) => {
+                // Create a ReadableStream for the response body
+                const stream = new ReadableStream({
+                  start(controller) {
+                    streamControllers.set(channelId, controller);
+                  },
+                  cancel() {
+                    streamControllers.delete(channelId);
+                  },
+                });
+
+                // Create and return the Response with the stream
+                resolve(
+                  new Response(stream, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: response.headers,
+                  }),
+                );
+              },
+              reject,
+              channelId,
+            });
+
+            window.parent.postMessage(
+              {
+                type: "proxyFetch",
+                id,
+                url,
+                init,
+                channelId,
+              },
+              "*",
+            );
+          });
+        };
+
+        window.addEventListener("message", async (event) => {
+          if (event.data.type === "takeScreenshot") {
+            const rootElement = document.getElementById(
+              "artifacts-component-root-html",
+            );
+            if (!rootElement) {
+              window.parent.postMessage(
+                {
+                  type: "screenshotError",
+                  error: new Error("Root element not found"),
+                },
+                "*",
+              );
+            }
+            const screenshot = await htmlToImage.toPng(rootElement, {
+              imagePlaceholder:
+                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAA1JREFUGFdjePDgwX8ACOQDoNsk0PMAAAAASUVORK5CYII=",
+            });
+            window.parent.postMessage(
+              {
+                type: "screenshotData",
+                data: screenshot,
+              },
+              "*",
+            );
+          } else if (event.data.type === "claudeComplete") {
+            const callback = callbacksMap.get(event.data.id);
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+            } else {
+              callback.resolve(event.data.completion);
+            }
+            callbacksMap.delete(event.data.id);
+          } else if (event.data.type === "proxyFetchResponse") {
+            const callback = callbacksMap.get(event.data.id);
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+              callbacksMap.delete(event.data.id);
+            } else {
+              // Initial response with headers, status, etc.
+              callback.resolve({
+                status: event.data.status,
+                statusText: event.data.statusText,
+                headers: event.data.headers,
+              });
+              // Don't delete the callback yet if streaming
+              if (!event.data.body) {
+                callbacksMap.delete(event.data.id);
+              }
+            }
+          } else if (event.data.type === "proxyFetchStream") {
+            // Handle streaming data chunks
+            const controller = streamControllers.get(event.data.channelId);
+            if (controller) {
+              if (event.data.error) {
+                controller.error(new Error(event.data.error));
+                streamControllers.delete(event.data.channelId);
+              } else if (event.data.done) {
+                controller.close();
+                streamControllers.delete(event.data.channelId);
+                // Clean up the callback
+                const callback = Array.from(callbacksMap.entries()).find(
+                  ([_, value]) => value.channelId === event.data.channelId,
+                );
+                if (callback) {
+                  callbacksMap.delete(callback[0]);
+                }
+              } else if (event.data.chunk) {
+                controller.enqueue(new Uint8Array(event.data.chunk));
+              }
+            }
+          } else if (event.data.type === "storageGet") {
+            const callback = callbacksMap.get(event.data.id);
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+            } else {
+              callback.resolve(event.data.result);
+            }
+            callbacksMap.delete(event.data.id);
+          } else if (event.data.type === "storageSet") {
+            const callback = callbacksMap.get(event.data.id);
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+            } else {
+              callback.resolve(event.data.result);
+            }
+            callbacksMap.delete(event.data.id);
+          } else if (event.data.type === "storageDelete") {
+            const callback = callbacksMap.get(event.data.id);
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+            } else {
+              callback.resolve(event.data.result);
+            }
+            callbacksMap.delete(event.data.id);
+          } else if (event.data.type === "storageList") {
+            const callback = callbacksMap.get(event.data.id);
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+            } else {
+              callback.resolve(event.data.result);
+            }
+            callbacksMap.delete(event.data.id);
+          }
+        });
+
+        window.addEventListener("click", (event) => {
+          const isEl = event.target instanceof HTMLElement;
+          if (!isEl) return;
+
+          // find ancestor links
+          const linkEl = event.target.closest("a");
+          if (!linkEl || !linkEl.href) return;
+
+          event.preventDefault();
+          event.stopImmediatePropagation();
+
+          if (linkEl.href.startsWith("blob-request:")) {
+            const blob = getBlobFromURL(linkEl.href);
+            if (!blob) return;
+            void blob.arrayBuffer().then((data) => {
+              window.parent.postMessage({
+                type: "downloadFile",
+                filename: linkEl.download,
+                data,
+                mimeType: blob.type || "application/octet-stream",
+              });
+            });
+          } else if (linkEl.href.startsWith("data:")) {
+            const [header, base64Data] = linkEl.href.split(",");
+            const mimeMatch = header.match(/data:([^;]+)/);
+            const mimeType = mimeMatch
+              ? mimeMatch[1]
+              : "application/octet-stream";
+            const binaryString = atob(base64Data);
+            const data = Uint8Array.from(binaryString, (c) =>
+              c.charCodeAt(0),
+            ).buffer;
+            window.parent.postMessage({
+              type: "downloadFile",
+              filename: linkEl.download,
+              data,
+              mimeType,
+            });
+          } else {
+            let linkUrl;
+            try {
+              linkUrl = new URL(linkEl.href);
+            } catch (error) {
+              return;
+            }
+
+            if (linkUrl.hostname === window.location.hostname) return;
+
+            window.parent.postMessage(
+              {
+                type: "openExternal",
+                href: linkEl.href,
+              },
+              "*",
+            );
+          }
+        });
+
+        const originalOpen = window.open;
+        window.open = function (url) {
+          window.parent.postMessage(
+            {
+              type: "openExternal",
+              href: url,
+            },
+            "*",
+          );
+        };
+
+        window.addEventListener("error", (event) => {
+          window.parent.postMessage(
+            { type: "console", message: "Uncaught Error: " + event.message },
+            "*",
+          );
+        });
+      })();
+    </script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cal AI Clone — Logic Flow</title>
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Outfit:wght@300;400;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&amp;family=Outfit:wght@300;400;600;700;800&amp;display=swap"
       rel="stylesheet"
     />
     <style>
@@ -30,6 +368,9 @@
         --muted: #3d5a80;
         --mono: "IBM Plex Mono", monospace;
         --sans: "Outfit", sans-serif;
+      }
+
+      * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
@@ -75,10 +416,10 @@
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        font-family: var(–mono);
+        font-family: var(--mono);
         font-size: 10px;
         letter-spacing: 3px;
-        color: var(–client);
+        color: var(--client);
         border: 1px solid rgba(0, 212, 255, 0.25);
         padding: 5px 14px;
         border-radius: 2px;
@@ -174,7 +515,7 @@
       }
 
       /* ══════════════════════════════════════
-VIEW 1: ARCHITECTURE (layers)
+   VIEW 1: ARCHITECTURE (layers)
 ══════════════════════════════════════ */
       .arch-layer {
         margin-bottom: 12px;
@@ -385,13 +726,13 @@ VIEW 1: ARCHITECTURE (layers)
       }
 
       /* ══════════════════════════════════════
-VIEW 2: LOGIC FLOW
+   VIEW 2: LOGIC FLOW
 ══════════════════════════════════════ */
       .flow-title {
         font-family: var(--mono);
         font-size: 10px;
         letter-spacing: 3px;
-        color: var(–-muted);
+        color: var(--muted);
         text-transform: uppercase;
         margin-bottom: 20px;
         margin-top: 32px;
@@ -403,7 +744,7 @@ VIEW 2: LOGIC FLOW
         content: "";
         flex: 1;
         height: 1px;
-        background: var(–-border);
+        background: var(--border);
       }
       .flow-title:first-child {
         margin-top: 0;
@@ -432,10 +773,10 @@ VIEW 2: LOGIC FLOW
         text-align: right;
       }
       .fl-step-num {
-        font-family: var(–-mono);
+        font-family: var(--mono);
         font-size: 10px;
         font-weight: 600;
-        color: var(–-muted);
+        color: var(--muted);
       }
       .fl-step-name {
         font-size: 12px;
@@ -444,9 +785,9 @@ VIEW 2: LOGIC FLOW
         margin-top: 2px;
       }
       .fl-step-desc {
-        font-family: var(–-mono);
+        font-family: var(--mono);
         font-size: 9px;
-        color: var(–-muted);
+        color: var(--muted);
         margin-top: 3px;
         line-height: 1.5;
       }
@@ -465,7 +806,7 @@ VIEW 2: LOGIC FLOW
         height: 14px;
         border-radius: 50%;
         border: 2px solid;
-        background: var(–-bg);
+        background: var(--bg);
         flex-shrink: 0;
         margin-top: 18px;
         position: relative;
@@ -492,12 +833,12 @@ VIEW 2: LOGIC FLOW
         display: flex;
         align-items: flex-start;
         gap: 8px;
-        font-family: var(–-mono);
+        font-family: var(--mono);
         font-size: 10px;
         padding: 8px 12px;
         border-radius: 6px;
-        border: 1px solid var(–-border);
-        background: var(–-panel);
+        border: 1px solid var(--border);
+        background: var(--panel);
         position: relative;
         max-width: 640px;
         line-height: 1.5;
@@ -531,47 +872,47 @@ VIEW 2: LOGIC FLOW
       }
 
       .msg-body {
-        color: var(–-text);
+        color: var(--text);
       }
       .msg-body .key {
         color: #fff;
       }
       .msg-body .val {
-        color: var(–-module);
+        color: var(--module);
       }
       .msg-body .type {
-        color: var(–-ai);
+        color: var(--ai);
       }
       .msg-body .err {
-        color: var(–-realtime);
+        color: var(--realtime);
       }
       .msg-body .url {
-        color: var(–-client);
+        color: var(--client);
       }
 
       /* Color schemes per system */
       .scheme-client .fl-dot {
-        border-color: var(–-client);
+        border-color: var(--client);
       }
       .scheme-client .fl-line {
-        background: linear-gradient(var(–-client), var(–-gateway));
+        background: linear-gradient(var(--client), var(--gateway));
       }
       .scheme-client .msg::before {
-        background: var(–-client);
+        background: var(--client);
       }
       .scheme-client .msg-dir {
         background: rgba(0, 212, 255, 0.12);
-        color: var(–-client);
+        color: var(--client);
       }
 
       .scheme-gateway .fl-dot {
-        border-color: var(–-gateway);
+        border-color: var(--gateway);
       }
       .scheme-gateway .fl-line {
-        background: linear-gradient(var(–-gateway), var(–-module));
+        background: linear-gradient(var(--gateway), var(--module));
       }
       .scheme-gateway .msg::before {
-        background: var(–-gateway);
+        background: var(--gateway);
       }
       .scheme-gateway .msg-dir {
         background: rgba(123, 97, 255, 0.12);
@@ -579,73 +920,73 @@ VIEW 2: LOGIC FLOW
       }
 
       .scheme-module .fl-dot {
-        border-color: var(–-module);
+        border-color: var(--module);
       }
       .scheme-module .fl-line {
-        background: linear-gradient(var(–-module), var(–-ai));
+        background: linear-gradient(var(--module), var(--ai));
       }
       .scheme-module .msg::before {
-        background: var(–-module);
+        background: var(--module);
       }
       .scheme-module .msg-dir {
         background: rgba(0, 229, 176, 0.12);
-        color: var(–-module);
+        color: var(--module);
       }
 
       .scheme-ai .fl-dot {
-        border-color: var(–-ai);
+        border-color: var(--ai);
       }
       .scheme-ai .fl-line {
-        background: linear-gradient(var(–-ai), var(–-db));
+        background: linear-gradient(var(--ai), var(--db));
       }
       .scheme-ai .msg::before {
-        background: var(–-ai);
+        background: var(--ai);
       }
       .scheme-ai .msg-dir {
         background: rgba(255, 159, 28, 0.12);
-        color: var(–-ai);
+        color: var(--ai);
       }
 
       .scheme-db .fl-dot {
-        border-color: var(–-db);
+        border-color: var(--db);
       }
       .scheme-db .fl-line {
-        background: linear-gradient(var(–-db), var(–-realtime));
+        background: linear-gradient(var(--db), var(--realtime));
       }
       .scheme-db .msg::before {
-        background: var(–-db);
+        background: var(--db);
       }
       .scheme-db .msg-dir {
         background: rgba(74, 222, 128, 0.12);
-        color: var(–-db);
+        color: var(--db);
       }
 
       .scheme-queue .fl-dot {
-        border-color: var(–-queue);
+        border-color: var(--queue);
       }
       .scheme-queue .fl-line {
-        background: linear-gradient(var(–-queue), var(–-realtime));
+        background: linear-gradient(var(--queue), var(--realtime));
       }
       .scheme-queue .msg::before {
-        background: var(–-queue);
+        background: var(--queue);
       }
       .scheme-queue .msg-dir {
         background: rgba(251, 146, 60, 0.12);
-        color: var(–-queue);
+        color: var(--queue);
       }
 
       .scheme-realtime .fl-dot {
-        border-color: var(–-realtime);
+        border-color: var(--realtime);
       }
       .scheme-realtime .fl-line {
-        background: linear-gradient(var(–-realtime), transparent);
+        background: linear-gradient(var(--realtime), transparent);
       }
       .scheme-realtime .msg::before {
-        background: var(–-realtime);
+        background: var(--realtime);
       }
       .scheme-realtime .msg-dir {
         background: rgba(244, 63, 94, 0.12);
-        color: var(–-realtime);
+        color: var(--realtime);
       }
 
       /* last row no line */
@@ -658,11 +999,11 @@ VIEW 2: LOGIC FLOW
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        font-family: var(–-mono);
+        font-family: var(--mono);
         font-size: 9px;
-        color: var(–-muted);
+        color: var(--muted);
         padding: 3px 8px;
-        border: 1px dashed var(–-border2);
+        border: 1px dashed var(--border2);
         border-radius: 3px;
         margin: 2px 0;
       }
@@ -676,45 +1017,45 @@ VIEW 2: LOGIC FLOW
         border-collapse: collapse;
         width: 100%;
         min-width: 700px;
-        font-family: var(–-mono);
+        font-family: var(--mono);
         font-size: 10px;
       }
       .matrix th,
       .matrix td {
-        border: 1px solid var(–-border);
+        border: 1px solid var(--border);
         padding: 8px 12px;
         text-align: left;
         vertical-align: top;
       }
       .matrix th {
-        background: var(–-panel2);
-        color: var(–-muted);
+        background: var(--panel2);
+        color: var(--muted);
         font-size: 9px;
         letter-spacing: 1px;
         text-transform: uppercase;
       }
       .matrix td {
-        background: var(–-panel);
-        color: var(–-text);
+        background: var(--panel);
+        color: var(--text);
       }
       .matrix tr:hover td {
-        background: var(–-panel2);
+        background: var(--panel2);
       }
       .matrix .from {
         color: #fff;
         font-weight: 600;
       }
       .matrix .to {
-        color: var(–-client);
+        color: var(--client);
       }
       .matrix .method {
-        color: var(–-ai);
+        color: var(--ai);
       }
       .matrix .payload {
-        color: var(–-module);
+        color: var(--module);
       }
       .matrix .response {
-        color: var(–-db);
+        color: var(--db);
       }
 
       /* ─── STACK SUMMARY ─── */
@@ -728,21 +1069,21 @@ VIEW 2: LOGIC FLOW
         display: flex;
         align-items: center;
         gap: 8px;
-        background: var(–-panel);
-        border: 1px solid var(–-border);
+        background: var(--panel);
+        border: 1px solid var(--border);
         border-radius: 6px;
         padding: 8px 12px;
-        font-family: var(–-mono);
+        font-family: var(--mono);
         font-size: 10px;
-        color: var(–-text);
+        color: var(--text);
         transition: border-color 0.2s;
       }
       .stack-chip:hover {
-        border-color: var(–-border2);
+        border-color: var(--border2);
       }
       .stack-chip-cat {
         font-size: 8px;
-        color: var(–-muted);
+        color: var(--muted);
         display: block;
       }
 
@@ -780,9 +1121,9 @@ VIEW 2: LOGIC FLOW
         display: flex;
         align-items: center;
         gap: 12px;
-        font-family: var(–-mono);
+        font-family: var(--mono);
         font-size: 10px;
-        color: var(–-ai);
+        color: var(--ai);
       }
       .groq-banner strong {
         color: #fff;
@@ -790,13 +1131,12 @@ VIEW 2: LOGIC FLOW
       }
     </style>
   </head>
-  <body>
+  <body id="artifacts-component-root-html">
     <div class="page">
       <!-- HEADER -->
-
       <div class="header">
         <div class="header-badge">SYSTEM DESIGN v2</div>
-        <h1>Diet AI — <span>Logic Flow</span></h1>
+        <h1>Cal AI Clone — <span>Logic Flow</span></h1>
         <p>
           NestJS · Flutter · Llama 4 Scout via Groq · PostgreSQL · MongoDB ·
           Redis · Docker
@@ -804,7 +1144,6 @@ VIEW 2: LOGIC FLOW
       </div>
 
       <!-- LEGEND -->
-
       <div class="legend">
         <div class="leg">
           <div class="leg-dot" style="background: var(--client)"></div>
@@ -841,7 +1180,6 @@ VIEW 2: LOGIC FLOW
       </div>
 
       <!-- TABS -->
-
       <div class="tabs">
         <button class="tab active" onclick="switchTab('arch')">
           Architecture
@@ -857,7 +1195,6 @@ VIEW 2: LOGIC FLOW
       <!-- ══════════════════════════════════════
      VIEW: ARCHITECTURE
 ══════════════════════════════════════ -->
-
       <div class="view active" id="view-arch">
         <div class="arch-layer">
           <div class="arch-label">01 — Clients</div>
@@ -866,7 +1203,7 @@ VIEW 2: LOGIC FLOW
               <span class="node-icon">📱</span>
               <div class="node-title">Flutter Mobile</div>
               <div class="node-sub">
-                <span>iOS & Android</span>
+                <span>iOS &amp; Android</span>
                 <span>Camera meal scan</span>
                 <span>Riverpod state</span>
                 <span>Dio HTTP client</span>
@@ -890,7 +1227,7 @@ VIEW 2: LOGIC FLOW
               <div class="node-sub">
                 <span>User management</span>
                 <span>Content moderation</span>
-                <span>Metrics & reports</span>
+                <span>Metrics &amp; reports</span>
               </div>
               <span class="badge c">Internal</span>
             </div>
@@ -939,7 +1276,7 @@ VIEW 2: LOGIC FLOW
               <span class="node-icon">👤</span>
               <div class="node-title">Users</div>
               <div class="node-sub">
-                <span>Profile & goals</span>
+                <span>Profile &amp; goals</span>
                 <span>Health metrics</span>
                 <span>Subscription</span>
               </div>
@@ -949,7 +1286,7 @@ VIEW 2: LOGIC FLOW
               <span class="node-icon">🍽️</span>
               <div class="node-title">Meals</div>
               <div class="node-sub">
-                <span>Logging & history</span>
+                <span>Logging &amp; history</span>
                 <span>Barcode scan</span>
                 <span>Food database</span>
               </div>
@@ -981,7 +1318,7 @@ VIEW 2: LOGIC FLOW
               <span class="node-icon">💬</span>
               <div class="node-title">Chat</div>
               <div class="node-sub">
-                <span>DMs & groups</span>
+                <span>DMs &amp; groups</span>
                 <span>WS gateway</span>
                 <span>Message history</span>
               </div>
@@ -992,8 +1329,8 @@ VIEW 2: LOGIC FLOW
               <span class="node-icon">🏘️</span>
               <div class="node-title">Community</div>
               <div class="node-sub">
-                <span>Posts & comments</span>
-                <span>Follows & feed</span>
+                <span>Posts &amp; comments</span>
+                <span>Follows &amp; feed</span>
                 <span>Reactions</span>
               </div>
               <span class="badge m">PG</span>
@@ -1158,7 +1495,6 @@ VIEW 2: LOGIC FLOW
       <!-- ══════════════════════════════════════
      VIEW: MEAL SCAN FLOW
 ══════════════════════════════════════ -->
-
       <div class="view" id="view-flow1">
         <div class="groq-banner">
           <span>⚡</span>
@@ -1171,7 +1507,6 @@ VIEW 2: LOGIC FLOW
 
         <div class="flow-title">Meal Photo Scan — Full Logic Flow</div>
         <div class="flow-canvas">
-          ```
           <div class="fl-row scheme-client">
             <div class="fl-step-meta">
               <div class="fl-step-num">STEP 01</div>
@@ -1438,14 +1773,12 @@ VIEW 2: LOGIC FLOW
               </div>
             </div>
           </div>
-          ```
         </div>
       </div>
 
       <!-- ══════════════════════════════════════
      VIEW: AI COACH FLOW
 ══════════════════════════════════════ -->
-
       <div class="view" id="view-flow2">
         <div class="groq-banner">
           <span>🧠</span>
@@ -1458,7 +1791,6 @@ VIEW 2: LOGIC FLOW
 
         <div class="flow-title">AI Coach Conversation — Full Logic Flow</div>
         <div class="flow-canvas">
-          ```
           <div class="fl-row scheme-client">
             <div class="fl-step-meta">
               <div class="fl-step-num">STEP 01</div>
@@ -1632,18 +1964,15 @@ VIEW 2: LOGIC FLOW
               </div>
             </div>
           </div>
-          ```
         </div>
       </div>
 
       <!-- ══════════════════════════════════════
      VIEW: CHAT FLOW
 ══════════════════════════════════════ -->
-
       <div class="view" id="view-flow3">
         <div class="flow-title">Real-Time Chat — Full Logic Flow</div>
         <div class="flow-canvas">
-          ```
           <div class="fl-row scheme-client">
             <div class="fl-step-meta">
               <div class="fl-step-num">STEP 01</div>
@@ -1790,14 +2119,12 @@ VIEW 2: LOGIC FLOW
               </div>
             </div>
           </div>
-          ```
         </div>
       </div>
 
       <!-- ══════════════════════════════════════
      VIEW: INTERACTION MATRIX
 ══════════════════════════════════════ -->
-
       <div class="view" id="view-matrix">
         <div class="flow-title">
           All System Interactions — Send / Receive Matrix
